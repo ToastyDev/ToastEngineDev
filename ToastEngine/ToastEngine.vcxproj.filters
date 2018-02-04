@@ -21,12 +21,12 @@
     <ClCompile Include="Source.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Initialize.cpp">
+    <ClCompile Include="InitVulkan.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Initialize.h">
+    <ClInclude Include="InitVulkan.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
