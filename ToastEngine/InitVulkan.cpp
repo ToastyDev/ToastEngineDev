@@ -34,19 +34,67 @@ void InitVulkan::WindowResize(GLFWwindow* window, int width, int height)
 }
 
 //Creates the instance of Vulkan
-void InitVulkan::CreateInstance()
+void InitVulkan::CreateInstance(const char* applicationName)
 {
+	if (enableValidationLayers && !CheckValidationLayerSupport)
+	{
+		throw std::runtime_error("Validation layers requested but not available");
+	}
+
+	VkApplicationInfo applicationInfo = {};
+	applicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+	applicationInfo.pApplicationName = applicationName;
+	applicationInfo.applicationVersion = VK_MAKE_VERSION(0, 0, 0);
+	applicationInfo.pEngineName = "Toast Engine";
+	applicationInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0);
+
+	VkInstanceCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+	createInfo.pApplicationInfo = &applicationInfo;
+
+	auto extensions = GetRequiredExtensions();
+	createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+	createInfo.ppEnabledExtensionNames = extensions.data();
+
+	if (enableValidationLayers)
+	{
+		createInfo.enabledExtensionCount = static_cast<uint32_t>(validationLayers.size());
+		createInfo.ppEnabledExtensionNames = validationLayers.data();
+	}
+	else
+	{
+		createInfo.enabledExtensionCount = 0;
+	}
+
+	if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create Vulkan Instance.")
+	}
 
 }
 
+//creates the callback report object from validation layers
 void InitVulkan::SetupDebugCallback()
 {
 	if (!enableValidationLayers) return;
+
+	VkDebugReportCallbackCreateInfoEXT createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
+	createInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
+	createInfo.pfnCallback = debugCallback;
+
+	if (vkCreateDebugReportCallbackEXT(instance, &createInfo, nullptr, &callback) != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create Debug Callback");
+	}
 }
 
 void InitVulkan::CreateSurface()
 {
-
+	if (glfwCreateWindowSurface(instance, &window, nullptr, &surface) != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create window surface.");
+	}
 }
 
 //Chooses which GPU to use and calculate on
@@ -79,7 +127,21 @@ void InitVulkan::PickPhysicalDevice()
 
 void InitVulkan::CreateLogicalDevice()
 {
+	QueueFamilyIndices indices = FindQueueFamilies(physicalDevice);
 
+	std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+	std::set<int> uniqueQueueFamilies = { indices.graphicsFamily, indices.presentFamily };
+
+	float queuePriority = 1.0f;
+	for (int queueFamily : uniqueQueueFamilies)
+	{
+		VkDeviceQueueCreateInfo queueCreateInfo = {};
+		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = queueFamily;
+		queueCreateInfo.queueCount = 1;
+		queueCreateInfo.pQueuePriorities = &queuePriority;
+		queueCreateInfos.push_back(queueCreateInfo);
+	}
 }
 
 void InitVulkan::CreateSwapchain()
@@ -218,6 +280,35 @@ bool CheckDeviceExtensionSupport(VkPhysicalDevice device)
 	return requiredExtensions.empty();
 }
 
+//Checks what validation layers are supported
+bool CheckValidationLayerSupport()
+{
+	uint32_t layerCount;
+	vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+	std::vector<VkLayerProperties> availableLayers(layerCount);
+	vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+
+	for (const char* layers : validationLayers)
+	{
+		bool layerFound = false;
+
+		for (const auto& layerProperties : availableLayers)
+		{
+			if (strcmp(layerName, layerProperties.layerName == 0))
+			{
+				layerFound = true;
+				break;
+			}
+		}
+		if (!layerFound)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
 //Finds queue families on a particular GPU
 QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device)
 {
@@ -336,8 +427,29 @@ VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities)
 	}
 }
 
-//
+//Gets the extensions required to use with GLFW
 std::vector<const char*> GetRequiredExtensions()
+{
+	std::vector<const char*> extensions;
+
+	unsigned int glfwExtensionCount = 0;
+	const char** glfwExtensions;
+	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+	for (unsigned int i = 0; i < glfwExtensionCount; i++)
+	{
+		extensions.push_back(glfwExtensions[i]);
+	}
+	if (enableValidationLayers)
+	{
+		extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+	}
+
+	return extensions;
+}
+
+//creates the vulkan debug object
+static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, size_t location, int32_t code, const char* layerPrefix, const char* msg, void* userData)
 {
 
 }
